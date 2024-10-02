@@ -1,9 +1,10 @@
 use std::fs;
 
+use bytes::{Buf, Bytes};
 use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
-use std::io;
 use std::io::prelude::*;
+use std::io::{self, BufReader};
 
 #[derive(Parser, Debug)]
 #[command(version, author, propagate_version = true)]
@@ -45,25 +46,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::write(".git/HEAD", "ref: refs/heads/main\n")?;
             println!("Initialized git directory")
         }
-        CatFile {
-            pretty_print,
-            object_hash,
-        } => {
-            // let file = fs::OpenOptions::new()
-            //     .read(true)
-            //     .write(true)
-            //     .create(true)
-            //     .open("foo.txt");
-
-            let mut f = fs::File::open(format!(
+        CatFile { object_hash, .. } => {
+            let f = fs::File::open(format!(
                 ".git/objects/{}/{}",
                 &object_hash[..2],
                 &object_hash[2..]
             ))?;
 
-            let mut z = ZlibDecoder::new(f);
-            let mut buf = String::new();
-            z.read_to_string(&mut buf)?;
+            let mut decoded = BufReader::new(ZlibDecoder::new(f));
+            let mut buf = Vec::new();
+
+            decoded.read_until(b'\0', &mut buf)?;
+
+            let header = String::from_utf8_lossy(&buf[..buf.len() - 1]);
+            let Some(size) = header.split_whitespace().nth(1) else {
+                return Err("could not find size".into());
+            };
+            let size = size.parse::<usize>()?;
+            buf.clear();
+            buf.resize(size, 0);
+            decoded.read_exact(&mut buf)?;
+
+            print!("{}", String::from_utf8(buf)?);
         }
     }
 
