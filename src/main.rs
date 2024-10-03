@@ -65,6 +65,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         HashObject { file, write } => {
+            // TODO: Literally creating 4 Vecs here, better to stream the bytes from one buffer to
+            // another directly instead of creating intermideate in memory buffers.
             let content = fs::read(file)?;
             let mut buf = format!("blob {}\0", content.len()).as_bytes().to_vec();
             buf.extend(content);
