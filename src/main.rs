@@ -75,29 +75,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
             encoder.write_all(&buf)?;
 
-            // let compressed = encoder.finish()?;
+            let hash = format!("{:x}", hasher.finalize());
+            let compressed = encoder.finish()?;
+            println!("{hash}");
 
-            let hash = hasher.finalize();
-            println!("{hash:x}");
+            if !write {
+                return Ok(());
+            }
+
+            let dir = PathBuf::from(format!(".git/objects/{}", &hash[..2]));
+            fs::create_dir_all(&dir)?;
+            fs::write(dir.join(&hash[2..]), compressed)?;
         }
     }
 
     Ok(())
-}
-
-struct HashWriter<W> {
-    writer: W,
-    hasher: Sha1,
-}
-
-impl<W: Write> Write for HashWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = self.writer.write(buf)?;
-        self.hasher.update(&buf[..n]);
-        Ok(n)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
-    }
 }
