@@ -1,10 +1,11 @@
 use std::fs;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
 
-use bytes::{Buf, Bytes};
 use clap::{Parser, Subcommand};
-use flate2::read::ZlibDecoder;
-use std::io::prelude::*;
-use std::io::{self, BufReader};
+use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use hex_literal::hex;
+use sha1::{Digest, Sha1};
 
 #[derive(Parser, Debug)]
 #[command(version, author, propagate_version = true)]
@@ -17,21 +18,15 @@ struct Cli {
 pub enum Command {
     Init,
     CatFile {
+        object_hash: String,
         #[arg(short, long)]
         pretty_print: bool,
-
-        object_hash: String,
     },
-}
-
-// Uncompresses a Zlib Encoded vector of bytes and returns a string or error
-// Here &[u8] implements Read
-
-fn decode_reader(bytes: Vec<u8>) -> io::Result<String> {
-    let mut z = ZlibDecoder::new(&bytes[..]);
-    let mut s = String::new();
-    z.read_to_string(&mut s)?;
-    Ok(s)
+    HashObject {
+        file: PathBuf,
+        #[arg(short, long)]
+        write: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,23 +48,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &object_hash[2..]
             ))?;
 
-            let mut decoded = BufReader::new(ZlibDecoder::new(f));
+            let mut docoder = BufReader::new(ZlibDecoder::new(f));
             let mut buf = Vec::new();
 
-            decoded.read_until(b'\0', &mut buf)?;
-
+            let _ = docoder.read_until(b'\0', &mut buf)?;
             let header = String::from_utf8_lossy(&buf[..buf.len() - 1]);
             let Some(size) = header.split_whitespace().nth(1) else {
                 return Err("could not find size".into());
             };
-            let size = size.parse::<usize>()?;
-            buf.clear();
-            buf.resize(size, 0);
-            decoded.read_exact(&mut buf)?;
+            let size = size.parse::<u64>()?;
+            let mut content = docoder.take(size);
+            let mut stdout = io::stdout().lock();
+            let n = io::copy(&mut content, &mut stdout)?;
+            if n != size {
+                return Err(format!("unexpected object size, expected {size} got {n}").into());
+            }
+        }
+        HashObject { file, write } => {
+            let content = fs::read(file)?;
+            let mut buf = format!("blob {}\0", content.len()).as_bytes().to_vec();
+            buf.extend(content);
 
-            print!("{}", String::from_utf8(buf)?);
+            let mut hasher = Sha1::new();
+            hasher.update(&buf);
+
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(&buf)?;
+
+            // let compressed = encoder.finish()?;
+
+            let hash = hasher.finalize();
+            println!("{hash:x}");
         }
     }
 
     Ok(())
+}
+
+struct HashWriter<W> {
+    writer: W,
+    hasher: Sha1,
+}
+
+impl<W: Write> Write for HashWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.writer.write(buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
 }
