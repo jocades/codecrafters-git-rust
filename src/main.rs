@@ -1,10 +1,5 @@
-mod cmd;
-mod object;
-
-use crate::cmd::Command;
 use clap::Parser;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+use codecrafters_git::Command;
 
 #[derive(Parser, Debug)]
 #[command(version, author, propagate_version = true)]

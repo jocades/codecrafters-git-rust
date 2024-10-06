@@ -1,10 +1,12 @@
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::fs::{self, File};
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use flate2::{write::ZlibEncoder, Compression};
 use sha1::{Digest, Sha1};
+
+use crate::Object;
 
 #[derive(Args, Debug)]
 pub struct HashObject {
@@ -13,31 +15,59 @@ pub struct HashObject {
     write: bool,
 }
 
+struct HashWriter<W: Write> {
+    inner: W,
+    hasher: Sha1,
+}
+
+impl<W: Write> HashWriter<W> {
+    pub fn new(writer: W) -> HashWriter<W> {
+        HashWriter {
+            inner: writer,
+            hasher: Sha1::new(),
+        }
+    }
+}
+
+impl<W: Write> Write for HashWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn hash_and_compress<R: Read, W: Write>(mut obj: Object<R>, writer: W) -> crate::Result<String> {
+    let encoder = ZlibEncoder::new(writer, Compression::default());
+    let mut writer = HashWriter::new(encoder);
+
+    write!(writer, "{} {}\0", obj.kind(), obj.size())?;
+    io::copy(&mut obj, &mut writer)?;
+
+    writer.inner.finish()?;
+    Ok(hex::encode(writer.hasher.finalize()))
+}
+
 impl HashObject {
     pub fn execute(self) -> crate::Result<()> {
-        // TODO: Literally creating 4 Vecs here, better to stream the bytes from one buffer to
-        // another directly instead of creating intermideate in memory buffers.
-        let content = fs::read(self.file)?;
-        let mut buf = format!("blob {}\0", content.len()).as_bytes().to_vec();
-        buf.extend(content);
+        let obj = Object::new_blob(&self.file)?;
 
-        let mut hasher = Sha1::new();
-        hasher.update(&buf);
+        let hash = if !self.write {
+            hash_and_compress(obj, io::sink())?
+        } else {
+            let tmp = "__tmp__";
+            let hash = hash_and_compress(obj, File::create(tmp)?)?;
+            let dir = Path::new(".git/objects").join(&hash[..2]);
+            fs::create_dir_all(&dir)?;
+            fs::rename(tmp, dir.join(&hash[2..]))?;
+            hash
+        };
 
-        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&buf)?;
-
-        let hash = format!("{:x}", hasher.finalize());
-        let compressed = encoder.finish()?;
         println!("{hash}");
-
-        if !self.write {
-            return Ok(());
-        }
-
-        let dir = PathBuf::from(format!(".git/objects/{}", &hash[..2]));
-        fs::create_dir_all(&dir)?;
-        fs::write(dir.join(&hash[2..]), compressed)?;
         Ok(())
     }
 }

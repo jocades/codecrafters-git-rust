@@ -1,8 +1,11 @@
-use std::fs;
-use std::io::{self, BufRead, BufReader, Read};
+use std::io;
 
 use clap::Args;
-use flate2::read::ZlibDecoder;
+
+use crate::object::{self, Object};
+
+// BLOB -> 08909652063260f9df101353883a4f68edbeed56
+// TREE -> 6a7b3b87b66664eb367297e05d7df885e898c5a5
 
 #[derive(Args, Debug)]
 pub struct CatFile {
@@ -14,28 +17,21 @@ pub struct CatFile {
 
 impl CatFile {
     pub fn execute(self) -> crate::Result<()> {
-        let f = fs::File::open(format!(
-            ".git/objects/{}/{}",
-            &self.object_hash[..2],
-            &self.object_hash[2..]
-        ))?;
+        let mut obj = Object::from_hash(&self.object_hash)?;
 
-        let mut docoder = BufReader::new(ZlibDecoder::new(f));
-        let mut buf = Vec::new();
+        use object::Kind::*;
+        match obj.kind() {
+            Blob => {
+                let mut stdout = io::stdout().lock();
+                let n = io::copy(&mut obj, &mut stdout)?;
 
-        let _ = docoder.read_until(b'\0', &mut buf)?;
-        let header = String::from_utf8_lossy(&buf[..buf.len() - 1]);
-        let Some(size) = header.split_whitespace().nth(1) else {
-            return Err("could not find size".into());
-        };
-        let size = size.parse::<u64>()?;
-        let mut content = docoder.take(size);
-        let mut stdout = io::stdout().lock();
-        let n = io::copy(&mut content, &mut stdout)?;
-        if n != size {
-            Err(format!("unexpected object size, expected {size} got {n}").into())
-        } else {
-            Ok(())
+                if n as usize != obj.size() {
+                    Err(format!("unexpected object size, got {} want {}", n, obj.size()).into())
+                } else {
+                    Ok(())
+                }
+            }
+            _ => unimplemented!(),
         }
     }
 }
