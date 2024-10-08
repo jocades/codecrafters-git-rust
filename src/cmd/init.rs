@@ -6,7 +6,7 @@ use clap::Args;
 pub struct Init;
 
 impl Init {
-    pub fn execute(self) -> crate::Result<()> {
+    pub fn execute(&self) -> crate::Result<()> {
         fs::create_dir(".git")?;
         fs::create_dir(".git/objects")?;
         fs::create_dir(".git/refs")?;

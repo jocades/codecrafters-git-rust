@@ -1,14 +1,7 @@
-#![allow(unused_imports)]
-
 use std::ffi::CStr;
-use std::fs;
 use std::io::{self, prelude::*};
-use std::path::{Path, PathBuf};
 
-use bytes::BytesMut;
 use clap::Args;
-use flate2::{write::ZlibEncoder, Compression};
-use sha1::{Digest, Sha1};
 
 use crate::object::{self, Object};
 
@@ -31,7 +24,7 @@ pub struct LsTree {
 // 100644 <kind> <blob_sha_2> <name>
 
 impl LsTree {
-    pub fn execute(self) -> crate::Result<()> {
+    pub fn execute(&self) -> crate::Result<()> {
         let mut obj = Object::from_hash(&self.object_hash)?;
 
         use object::Kind::*;

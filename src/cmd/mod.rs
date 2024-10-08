@@ -1,14 +1,17 @@
 mod init;
-pub use init::Init;
+use init::Init;
 
 mod cat_file;
-pub use cat_file::CatFile;
+use cat_file::CatFile;
 
 mod hash_object;
-pub use hash_object::HashObject;
+use hash_object::HashObject;
 
 mod ls_tree;
-pub use ls_tree::LsTree;
+use ls_tree::LsTree;
+
+mod write_tree;
+use write_tree::WriteTree;
 
 use clap::Subcommand;
 
@@ -18,16 +21,18 @@ pub enum Command {
     CatFile(CatFile),
     HashObject(HashObject),
     LsTree(LsTree),
+    WriteTree(WriteTree),
 }
 
 impl Command {
-    pub fn execute(self) -> crate::Result<()> {
+    pub fn execute(&self) -> crate::Result<()> {
         use Command::*;
         match self {
             Init(cmd) => cmd.execute(),
             CatFile(cmd) => cmd.execute(),
             HashObject(cmd) => cmd.execute(),
             LsTree(cmd) => cmd.execute(),
+            WriteTree(cmd) => cmd.execute(),
         }
     }
 }

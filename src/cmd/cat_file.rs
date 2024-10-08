@@ -16,7 +16,7 @@ pub struct CatFile {
 }
 
 impl CatFile {
-    pub fn execute(self) -> crate::Result<()> {
+    pub fn execute(&self) -> crate::Result<()> {
         let mut obj = Object::from_hash(&self.object_hash)?;
 
         use object::Kind::*;
