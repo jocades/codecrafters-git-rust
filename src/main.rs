@@ -1,5 +1,12 @@
+mod object;
+use object::Object;
+
+mod cmd;
+use cmd::Command;
+
 use clap::Parser;
-use codecrafters_git::Command;
+
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Parser, Debug)]
 #[command(version, author, propagate_version = true)]

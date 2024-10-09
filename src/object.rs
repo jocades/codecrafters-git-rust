@@ -1,14 +1,14 @@
-use flate2::{write::ZlibEncoder, Compression};
-use sha1::{Digest, Sha1};
 use std::ffi::CStr;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fmt, fs};
 
-use flate2::read::ZlibDecoder;
+use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use sha1::{Digest, Sha1};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Kind {
     Blob,
     Tree,
@@ -78,43 +78,48 @@ impl<R: Read> Object<R> {
         W: Write,
     {
         let encoder = ZlibEncoder::new(writer, Compression::default());
-        let mut writer = HashWriter::new(encoder);
+        let mut hasher = Hasher::new(encoder);
 
-        write!(writer, "{} {}\0", self.kind(), self.size())?;
-        io::copy(self, &mut writer)?;
+        write!(hasher, "{} {}\0", self.kind(), self.size())?;
+        io::copy(self, &mut hasher)?;
 
-        writer.inner.finish()?;
-        Ok(writer.hasher.finalize().into())
+        hasher.writer.finish()?;
+        Ok(hasher.inner.finalize().into())
     }
 
-    pub fn encode_and_write(&mut self) -> crate::Result<[u8; 20]> {
-        let tmp = "__tmp";
-        let hash = self.compress_and_hash(&mut File::create(tmp)?)?;
+    pub fn write(&mut self) -> crate::Result<[u8; 20]> {
+        let temp = std::env::temp_dir().join(format!(
+            "{}_{}",
+            self.kind(),
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis()
+        ));
+        let hash = self.compress_and_hash(&mut File::create(&temp)?)?;
         let path = hash_to_path(&hex::encode(hash));
         fs::create_dir_all(&path.parent().ok_or("no parent path")?)?;
-        fs::rename(tmp, path)?;
+        fs::rename(temp, path)?;
         Ok(hash)
     }
 }
 
-struct HashWriter<W: Write> {
-    inner: W,
-    hasher: Sha1,
+#[derive(Debug)]
+struct Hasher<W> {
+    inner: Sha1,
+    writer: W,
 }
 
-impl<W: Write> HashWriter<W> {
-    pub fn new(writer: W) -> HashWriter<W> {
-        HashWriter {
-            inner: writer,
-            hasher: Sha1::new(),
+impl Hasher<()> {
+    pub fn new<W: Write>(writer: W) -> Hasher<W> {
+        Hasher {
+            inner: Sha1::new(),
+            writer,
         }
     }
 }
 
-impl<W: Write> Write for HashWriter<W> {
+impl<W: Write> Write for Hasher<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let n = self.inner.write(buf)?;
-        self.hasher.update(&buf[..n]);
+        let n = self.writer.write(buf)?;
+        self.inner.update(&buf[..n]);
         Ok(n)
     }
 

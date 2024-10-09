@@ -9,19 +9,18 @@ use crate::object::{Kind, Object};
 #[derive(Args, Debug)]
 pub struct WriteTree;
 
+/// .gitignore
+const IGNORE: [&'static str; 2] = ["./.git", "./target"];
+
 fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
-    let mut buf: Vec<u8> = Vec::new();
     let mut entries = fs::read_dir(&path)?
-        .filter_map(|e| {
-            e.ok().filter(|e| {
-                let path = e.path();
-                !path.starts_with("./.git") && !path.starts_with("./target")
-            })
-        })
+        .filter_map(|e| e.ok())
+        .filter(|e| !IGNORE.iter().any(|pattern| e.path().starts_with(pattern)))
         .collect::<Vec<_>>();
 
     entries.sort_by_key(|e| e.file_name());
 
+    let mut buf = Vec::new();
     for entry in entries {
         let name = dbg!(entry.file_name());
         let meta = entry.metadata()?;
@@ -43,7 +42,7 @@ fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
             hash
         } else {
             let mut obj = Object::new_blob(&path)?;
-            obj.encode_and_write()?
+            obj.write()?
         };
 
         buf.extend(mode.as_bytes());
@@ -54,11 +53,11 @@ fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
     }
 
     if buf.is_empty() {
-        Ok(None)
-    } else {
-        let hash = Object::new(Kind::Tree, buf.len(), buf.as_slice())?.encode_and_write()?;
-        Ok(Some(hash))
+        return Ok(None);
     }
+
+    let hash = Object::new(Kind::Tree, buf.len(), buf.as_slice())?.write()?;
+    Ok(Some(hash))
 }
 
 impl WriteTree {

@@ -9,15 +9,14 @@ use crate::object::{self, Object};
 
 #[derive(Args, Debug)]
 pub struct CatFile {
-    object_hash: String,
-
+    hash: String,
     #[arg(short, long)]
     pretty_print: bool,
 }
 
 impl CatFile {
     pub fn execute(&self) -> crate::Result<()> {
-        let mut obj = Object::from_hash(&self.object_hash)?;
+        let mut obj = Object::from_hash(&self.hash)?;
 
         use object::Kind::*;
         match obj.kind() {

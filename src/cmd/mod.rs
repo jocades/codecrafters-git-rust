@@ -13,6 +13,9 @@ use ls_tree::LsTree;
 mod write_tree;
 use write_tree::WriteTree;
 
+mod commit_tree;
+use commit_tree::CommitTree;
+
 use clap::Subcommand;
 
 #[derive(Subcommand, Debug)]
@@ -22,6 +25,7 @@ pub enum Command {
     HashObject(HashObject),
     LsTree(LsTree),
     WriteTree(WriteTree),
+    CommitTree(CommitTree),
 }
 
 impl Command {
@@ -33,6 +37,7 @@ impl Command {
             HashObject(cmd) => cmd.execute(),
             LsTree(cmd) => cmd.execute(),
             WriteTree(cmd) => cmd.execute(),
+            CommitTree(cmd) => cmd.execute(),
         }
     }
 }

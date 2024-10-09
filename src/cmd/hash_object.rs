@@ -19,7 +19,7 @@ impl HashObject {
         let hash = if !self.write {
             obj.compress_and_hash(&mut io::sink())?
         } else {
-            obj.encode_and_write()?
+            obj.write()?
         };
 
         println!("{}", hex::encode(hash));
