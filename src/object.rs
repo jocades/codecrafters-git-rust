@@ -37,10 +37,6 @@ impl<R> Object<R> {
 }
 
 impl Object<()> {
-    pub fn new<R: Read>(kind: Kind, size: usize, data: R) -> crate::Result<Object<impl Read>> {
-        Ok(Object { kind, size, data })
-    }
-
     pub fn new_blob<P: AsRef<Path>>(path: P) -> crate::Result<Object<impl BufRead>> {
         let file = File::open(path)?;
         let stat = file.metadata()?;
@@ -48,6 +44,14 @@ impl Object<()> {
             kind: Kind::Blob,
             size: stat.len() as usize,
             data: BufReader::new(file),
+        })
+    }
+
+    pub fn from_bytes(kind: Kind, bytes: &[u8]) -> crate::Result<Object<impl Read + '_>> {
+        Ok(Object {
+            kind,
+            size: bytes.len(),
+            data: bytes,
         })
     }
 

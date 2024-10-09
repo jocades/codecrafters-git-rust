@@ -1,4 +1,4 @@
-use std::io::prelude::*;
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::Args;
@@ -9,7 +9,7 @@ use crate::object::{Kind, Object};
 pub struct CommitTree {
     tree_sha: String,
     #[arg(short)]
-    parent_commit: String,
+    parent_commit: Option<String>,
     #[arg(short)]
     message: String,
 }
@@ -28,16 +28,18 @@ impl CommitTree {
             return Err("cannot commit an object other than a tree".into());
         }
 
-        let date_secs = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let mut buf = Vec::new();
         writeln!(buf, "tree {}", self.tree_sha)?;
-        writeln!(buf, "parent {}", self.parent_commit)?;
-        let author = format!("Jordi Calafat <me@mail.com> {date_secs} +0200");
+        if let Some(parent) = &self.parent_commit {
+            writeln!(buf, "parent {parent}")?;
+        }
+        let secs = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let author = format!("Jordi Calafat <me@mail.com> {secs} +0200");
         writeln!(buf, "author {author}")?;
         writeln!(buf, "commiter {author}\n")?; // double nl
         writeln!(buf, "{}", self.message)?;
 
-        let hash = Object::new(Kind::Commit, buf.len(), buf.as_slice())?.write()?;
+        let hash = Object::from_bytes(Kind::Commit, &buf)?.write()?;
         println!("{}", hex::encode(hash));
 
         Ok(())

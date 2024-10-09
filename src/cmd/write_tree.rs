@@ -41,8 +41,7 @@ fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
             };
             hash
         } else {
-            let mut obj = Object::new_blob(&path)?;
-            obj.write()?
+            Object::new_blob(&path)?.write()?
         };
 
         buf.extend(mode.as_bytes());
@@ -56,7 +55,7 @@ fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
         return Ok(None);
     }
 
-    let hash = Object::new(Kind::Tree, buf.len(), buf.as_slice())?.write()?;
+    let hash = Object::from_bytes(Kind::Tree, &buf)?.write()?;
     Ok(Some(hash))
 }
 
