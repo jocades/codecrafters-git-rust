@@ -10,5 +10,6 @@ rust-version = "1.80"
 clap = { version = "4.5.19", features = ["derive"] }
 flate2 = "1.0.34"
 hex = "0.4.3"
+reqwest = { version = "0.12.8", features = ["blocking"] }
 sha1 = "0.10.6"
 # thiserror = "1.0.38"                                 # error handling

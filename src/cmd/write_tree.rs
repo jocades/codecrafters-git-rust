@@ -55,7 +55,7 @@ fn write_tree<P: AsRef<Path>>(path: P) -> crate::Result<Option<[u8; 20]>> {
         return Ok(None);
     }
 
-    let hash = Object::from_bytes(Kind::Tree, &buf)?.write()?;
+    let hash = Object::from_bytes(Kind::Tree, &buf).write()?;
     Ok(Some(hash))
 }
 

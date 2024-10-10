@@ -1,3 +1,5 @@
+use std::ffi::CStr;
+use std::io::prelude::*;
 use std::rc::Rc;
 
 fn main() {
@@ -14,6 +16,13 @@ fn main() {
     let _ = b.len();
 
     drop(b);
+
+    let s = "hello\0world";
+    let mut reader = s.as_bytes();
+    let mut buf: Vec<u8> = Vec::new();
+    reader.read_to_end(&mut buf).unwrap();
+    let x = CStr::from_bytes_until_nul(buf.as_slice()).unwrap();
+    assert_eq!(x.to_string_lossy(), "hello");
 }
 
 fn take_rc_str(s: Rc<str>) -> usize {

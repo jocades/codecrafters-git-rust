@@ -39,7 +39,7 @@ impl CommitTree {
         writeln!(buf, "commiter {author}\n")?; // double nl
         writeln!(buf, "{}", self.message)?;
 
-        let hash = Object::from_bytes(Kind::Commit, &buf)?.write()?;
+        let hash = Object::from_bytes(Kind::Commit, &buf).write()?;
         println!("{}", hex::encode(hash));
 
         Ok(())

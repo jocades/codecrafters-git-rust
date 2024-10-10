@@ -47,12 +47,12 @@ impl Object<()> {
         })
     }
 
-    pub fn from_bytes(kind: Kind, bytes: &[u8]) -> crate::Result<Object<impl Read + '_>> {
-        Ok(Object {
+    pub fn from_bytes(kind: Kind, bytes: &[u8]) -> Object<impl Read + '_> {
+        Object {
             kind,
             size: bytes.len(),
             data: bytes,
-        })
+        }
     }
 
     pub fn from_hash(hash: &str) -> crate::Result<Object<impl BufRead>> {
